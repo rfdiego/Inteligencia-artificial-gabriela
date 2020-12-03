@@ -1,0 +1,80 @@
+
+#libs necessárias para o projeto
+import numpy as np
+from sklearn import tree
+import graphviz
+from sklearn.model_selection import cross_val_score
+import math
+import pandas as pd
+
+# Carregamos o banco de dados ...dica https://nymarya.github.io/5-modos-de-carregar-arquivos-no-google-colab/
+df = pd.read_csv('https://raw.githubusercontent.com/rfdiego/AnaliseDeDados/main/census.csv', sep=',')
+#print(df.info()) ok
+
+#certificar se existe dados faltantes, no caso não há
+df.isnull().sum()
+
+#Manipulação da variável TARGET
+# Criar uma nova coluna hoursweek_bi, trocando todos os valores .. se for maior que 40 troca por string ">=40" etc....
+df ['hoursweek_bi'] = df['hour.per.week'].apply (lambda x: '>40' if x>40 else '<=40')
+#transformar para números
+df ['hoursweek_bi'] = df.apply (lambda row: 1 if '>40'in row ['hoursweek_bi'] else 0, axis = 1)
+#print(df ['hoursweek_bi'])
+
+# Criar uma nova coluna income_bi
+df ['income_bi'] = df.apply (lambda row: 1 if '>50K'in row ['income'] else 0, axis = 1)
+#print(df ['income_bi'])
+
+
+# remover colunas redundantes que nao fará parte do estudo
+# income será utilizada mas foi criada com outro nome então esta sendo deletada, hourperweek já esta transformada
+colunasRedundantes = ['final.weight','education.num','capital.gain',
+                      'capital.loos','hour.per.week','income']              
+df = df.drop( colunasRedundantes , axis=1)        
+
+
+#transformar os valores categóricos para valores numéricos.
+colunasCategoricas = ['age','native.country','workclass','education','sex',
+                      'marital.status','occupation','relationship','race']
+df = pd.get_dummies(df, columns= colunasCategoricas )
+#print(df.head())
+
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( df.drop('hoursweek_bi',axis=1),
+                                                    df['hoursweek_bi'] , test_size=0.25)
+
+
+clf = tree.DecisionTreeClassifier(criterion='entropy', max_depth=10)
+clf = clf.fit(X_train, y_train)
+predictions = clf.predict(X_test)
+
+import pandas as pd
+print("\nMatriz de confusão detalhada:\n",
+ pd.crosstab(y_test, predictions, rownames=['Real'], colnames=['Predito'],
+ margins=True, margins_name='Todos'))
+
+import sklearn.metrics as metrics
+print("Relatório sobre o teor:\n")
+print(metrics.classification_report(y_test, predictions, target_names=['<=40h', '>40h']))
+
+#para determinada qual nivel sera melhor a ser usado
+'''
+for max_depth in range(1, 20):
+    t = tree.DecisionTreeClassifier(criterion='entropy', max_depth=max_depth)
+    scores = cross_val_score(t,  df.drop('hoursweek_bi',axis=1),  df['hoursweek_bi'] , cv=5)
+    print("Max depth: %d, Accuracy: %0.2f (+/- %0.2f)" % (max_depth, scores.mean(), scores.std()*2))
+'''
+
+import graphviz
+dot_data = tree.export_graphviz(clf, out_file=None)
+graph = graphviz.Source(dot_data)
+#graph.render("WDBC")
+
+dot_data = tree.export_graphviz(clf, out_file=None,
+# feature_names=feature_names,
+#class_names=target_names,
+filled=True, rounded=True,
+ special_characters=True)
+graph = graphviz.Source(dot_data, format="png")
+graph

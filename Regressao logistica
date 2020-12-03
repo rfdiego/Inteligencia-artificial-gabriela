@@ -1,0 +1,76 @@
+#libs necessárias para o projeto
+import numpy as np
+from sklearn import tree
+import graphviz
+from sklearn.model_selection import cross_val_score
+import math
+import pandas as pd
+
+# Carregamos o banco de dados ...dica https://nymarya.github.io/5-modos-de-carregar-arquivos-no-google-colab/
+df = pd.read_csv('https://raw.githubusercontent.com/rfdiego/AnaliseDeDados/main/census.csv', sep=',')
+#print(df.info()) ok
+
+#certificar se existe dados faltantes, no caso não há
+df.isnull().sum()
+
+#Manipulação da variável TARGET
+# Crie uma nova coluna hoursweek_bi, trocando todos os valores .. se for maior que 40 troca por string ">=40" etc....
+df ['hoursweek_bi'] = df['hour.per.week'].apply (lambda x: '1' if x>40 else '0')
+#df ['hoursweek_bi'] = df['hour.per.week'].apply (lambda x: '>40' if x>40 else '<=40')
+#transformar para números           >40=1   <=40=0
+#df ['hoursweek_bi'] = df.apply (lambda row: 1 if '>40'in row ['hoursweek_bi'] else 0, axis = 1)
+#print(df ['hoursweek_bi'].head(10))
+
+# Crie uma nova coluna income_bi    >50k=1  <=50k=0
+df ['income_bi'] = df.apply (lambda row: 1 if '>50K'in row ['income'] else 0, axis = 1)
+#print(df ['income_bi'])
+
+# Crie uma nova coluna sex_bi,      male=1  female=0
+df ['sex_bi'] = df.apply (lambda row: 1 if 'Male'in row ['sex'] else 0, axis = 1)
+#print(df ['sex_bi'])
+
+
+# remover colunas redundantes que nao fará parte do estudo
+colunasRedundantes = ['final.weight','education.num','capital.gain',
+                      'capital.loos','hour.per.week','income','sex']              
+df = df.drop( colunasRedundantes , axis=1)    
+#obs: income e sex foram transformadas, sao retiradas da base mas permanecem com outro nome     
+
+#transformar os valores categóricos para valores numéricos. 
+#Atributos já ok = age, sex, income, hoursweek_bi, 
+colunasCategoricas = ['age','native.country','workclass','education',
+                      'marital.status','occupation','relationship','race'] #sex e income já estao inclusos!
+                      
+df = pd.get_dummies(df, columns= colunasCategoricas )
+#print(df.head(10))
+#df.info()
+
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split( df.drop('hoursweek_bi',axis=1),
+                                                    df['hoursweek_bi'] , test_size=0.25, random_state=101)
+
+
+#X_train
+#y_train
+
+#treinando
+from sklearn.linear_model import LogisticRegression
+#logmodel = LogisticRegression(solver='lbfgs',max_iter=1000)
+logmodel = LogisticRegression(C=1.0, class_weight=None, dual=False, fit_intercept=True,
+                   intercept_scaling=1, l1_ratio=None, max_iter=1000,
+                   multi_class='auto', n_jobs=None, penalty='l2',
+                   random_state=None, solver='lbfgs', tol=0.0001, verbose=0,
+                   warm_start=False).fit(X_train,y_train)
+
+#Fazendo predições 
+predictions = logmodel.predict(X_test) 
+predictions
+
+#Avaliação
+from sklearn.metrics import classification_report 
+print(classification_report(y_test,predictions))
+
+print("\nMatriz de confusão detalhada:\n",
+ pd.crosstab(y_test, predictions, rownames=['Real'], colnames=['Predito'],
+ margins=True, margins_name='Todos'))

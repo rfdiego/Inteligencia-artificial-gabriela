@@ -1,0 +1,94 @@
+#libs necessárias para o projeto
+import numpy as np
+from sklearn import tree
+import graphviz
+from sklearn.model_selection import cross_val_score
+import math
+import pandas as pd
+
+# Carregamos o banco de dados ...dica https://nymarya.github.io/5-modos-de-carregar-arquivos-no-google-colab/
+df = pd.read_csv('https://raw.githubusercontent.com/rfdiego/AnaliseDeDados/main/census.csv', sep=',')
+#print(df.info()) ok
+
+#certificar se existe dados faltantes, no caso não há
+df.isnull().sum()
+
+#Manipulação da variável TARGET
+# Crie uma nova coluna hoursweek_bi, trocando todos os valores .. se for maior que 40 troca por string ">=40" etc....
+df ['hoursweek_bi'] = df['hour.per.week'].apply (lambda x: '1' if x>40 else '0')
+
+# remover colunas redundantes que nao fará parte do estudo
+colunasRedundantes = ['final.weight','education.num','capital.gain',
+                      'capital.loos','hour.per.week']              
+df = df.drop( colunasRedundantes , axis=1)    
+ 
+
+#transformando a variavel target em numerica 
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+labelencoder_X = LabelEncoder()
+df['Nwork'] = labelencoder_X.fit_transform(df['workclass'])
+#df['Nwork'].value_counts()
+df['Nrace'] = labelencoder_X.fit_transform(df['race'])
+df['Neducation'] = labelencoder_X.fit_transform(df['education'])
+df['Nmarital'] = labelencoder_X.fit_transform(df['marital.status'])
+df['Noccupation'] = labelencoder_X.fit_transform(df['occupation'])
+df['Nrelationship'] = labelencoder_X.fit_transform(df['relationship'])
+df['Nnativecontry'] = labelencoder_X.fit_transform(df['native.country'])
+df['Nincome'] = labelencoder_X.fit_transform(df['income'])
+df['Nsex'] = labelencoder_X.fit_transform(df['sex'])
+
+#Remover os valores antigos
+df = df.drop( ['Unnamed: 0','workclass','income','sex','race','education','marital.status','native.country','relationship','occupation'] , axis=1)  
+
+#df
+X = df.drop('hoursweek_bi',axis=1)
+Y = df['hoursweek_bi']
+
+#normalizamos
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler() 
+
+scaled_values = scaler.fit_transform(df) 
+df.loc[:,:] = scaled_values
+
+#df['hoursweek_bi'].head(20)
+df
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(df.drop('hoursweek_bi',axis=1),
+                                                    df['hoursweek_bi'] , 
+                                                    test_size=0.25, random_state=1) 
+
+
+from sklearn.metrics import confusion_matrix 
+from sklearn.neighbors import KNeighborsClassifier 
+
+knn = KNeighborsClassifier(n_neighbors=10, metric='euclidean') 
+
+knn.fit(X_train, y_train) 
+y_pred = knn.predict(X_test) 
+y_pred
+
+print("\nMatriz de confusão detalhada:\n", confusion_matrix(y_test, y_pred) )
+
+from sklearn.metrics import classification_report
+print(classification_report(y_test,y_pred))
+
+import seaborn as sns
+#grafico
+sns.scatterplot( 
+x='Nwork', 
+y='Noccupation', 
+hue='hoursweek_bi', 
+data=X_test.join(y_test, how='outer') 
+) 
+
+import matplotlib.pyplot as plt
+plt.scatter( 
+X_test['Nwork'], 
+X_test['Noccupation'], 
+c=y_pred, 
+cmap='coolwarm', 
+alpha=0.7 
+) 
